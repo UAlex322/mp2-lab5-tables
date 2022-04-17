@@ -10,12 +10,7 @@ using namespace std;
 template <typename Key, typename Value>
 class HashTable {
 
-	struct Entry {
-		Key key;
-		Value *value_ptr;
-
-		Entry(const Key &key = Key(), Value *const value_ptr = nullptr): key(key), value_ptr(value_ptr) {}
-	};
+	using Entry = pair<Key,Value>;
 
 public:
 
@@ -38,19 +33,17 @@ public:
 		reference operator*() const { return *it; }
 		pointer operator->() const {return &(*it); }
 
-		iterator& operator++() { 
+		iterator& operator++() {
 			++it;
 
 			if (it == ht.bucket[index].end()) {
 				++index;
-				while (ht.bucket[index].empty() && index < ht.size_)
+				while (index < ht.num_of_buckets && ht.bucket[index].empty())
 					++index;
 
-				if (index == ht.size_) {
+				if (index == ht.num_of_buckets)
 					it = ht.bucket.back().end();
-					index = ht.num_of_buckets - 1;
-				}
-				else 
+				else
 					it = ht.bucket[index].begin();
 			}
 
@@ -61,11 +54,11 @@ public:
 		iterator& operator--() {
 			if (it == ht.bucket[index].begin()) {
 				--index;
-				while (ht.bucket[index].empty() && index >= 0)
+				while (index >= 0 && ht.bucket[index].empty())
 					--index;
 
 				if (index == -1)
-					it = prev(ht.bucket[0].begin());
+					it = ht.bucket[0].begin();
 				else
 					it = prev(ht.bucket[index].end());
 			}
@@ -107,14 +100,12 @@ public:
 
 			if (it == ht.bucket[index].cend()) {
 				++index;
-				while (ht.bucket[index].empty() && index < ht.size_)
+				while (index < ht.num_of_buckets && ht.bucket[index].empty())
 					++index;
 
 				// проверка, прошёл ли итератор через все элементы
-				if (index == ht.size_) {
+				if (index == ht.num_of_buckets)
 					it = ht.bucket.back().cend();
-					index = ht.num_of_buckets - 1;
-				}
 				else
 					it = ht.bucket[index].cbegin();
 			}
@@ -126,12 +117,12 @@ public:
 		const_iterator& operator--() {
 			if (it == ht.bucket[index].begin()) {
 				--index;
-				while (ht.bucket[index].empty() && index >= 0)
+				while (index >= 0 && ht.bucket[index].empty())
 					--index;
 
 				// проверка, прошёл ли итератор через все элементы
 				if (index == -1)
-					it = prev(ht.bucket[0].cbegin());
+					it = ht.bucket[0].cbegin();
 				else
 					it = prev(ht.bucket[index].cend());
 			}
@@ -168,7 +159,6 @@ public:
 	void insert(const Key &key, const Value &value);
 	void erase(const Key &key);
 	Value& operator[](const Key &key);
-	const Value& operator[](const Key &key) const;
 
 	size_t size() {return size_;}
 	void clear();
@@ -197,11 +187,11 @@ private:
 	size_t key_mask;
 	double max_load_factor = 1.0;
 #ifdef ENABLE_PROFILING
-	size_t find_ops;
-	size_t insert_ops;
-	size_t erase_ops;
-	size_t clear_ops;
-	size_t brackets_ops;
+	size_t find_ops = 0;
+	size_t insert_ops = 0;
+	size_t erase_ops = 0;
+	size_t clear_ops = 0;
+	size_t brackets_ops = 0;
 #endif
 
 	// служебный конструктор с возможностью задания размера
@@ -211,9 +201,8 @@ private:
 
 	iterator common_find(const Key &key);
 
-	// вставка ключа и указателя на данные
-	void insert_fast(const Key &key, Value *const &value_ptr) {
-		bucket[hash(key) & key_mask].emplace_front(key, value_ptr);
+	void insert_fast(pair<Key,Value> &&entry) {
+		bucket[hash(entry.first) & key_mask].emplace_front(entry);
 	}
 
 	// рехеш
@@ -228,13 +217,13 @@ typename HashTable<Key,Value>::iterator HashTable<Key,Value>::begin() {
 		++index;
 
 	if (index == num_of_buckets)
-		return iterator(*this, bucket.back().end(), num_of_buckets-1);
+		return iterator(*this, bucket.back().end(), num_of_buckets);
 	return iterator(*this, bucket[index].begin(), index);
 }
 
 template <typename Key, typename Value>
 typename HashTable<Key,Value>::iterator HashTable<Key,Value>::end() {
-	return iterator(*this, bucket.back().end(), num_of_buckets-1);
+	return iterator(*this, bucket.back().end(), num_of_buckets);
 }
 
 template <typename Key, typename Value>
@@ -245,13 +234,13 @@ typename HashTable<Key,Value>::const_iterator HashTable<Key,Value>::cbegin() {
 		++index;
 
 	if (index == num_of_buckets)
-		return const_iterator(*this, bucket.back().cend(), num_of_buckets-1);
+		return const_iterator(*this, bucket.back().cend(), num_of_buckets);
 	return const_iterator(*this, bucket[index].cbegin(), index);
 }
 
 template <typename Key, typename Value>
 typename HashTable<Key,Value>::const_iterator HashTable<Key,Value>::cend() {
-	return const_iterator(*this, bucket.back().cend(), num_of_buckets-1);
+	return const_iterator(*this, bucket.back().cend(), num_of_buckets);
 }
 
 template <typename Key, typename Value>
@@ -269,7 +258,7 @@ typename HashTable<Key,Value>::iterator HashTable<Key,Value>::common_find(const 
 	#ifdef ENABLE_PROFILING
 		++find_ops;
 	#endif
-		if ((*it).key == key)
+		if (it->first == key)
 			return iterator(*this, it, hash_val);
 		++it;
 	}
@@ -295,7 +284,7 @@ void HashTable<Key,Value>::insert(const Key &key, const Value &value) {
 #ifdef ENABLE_PROFILING
 	insert_ops += find_ops;
 #endif
-	bucket[hash(key) & key_mask].emplace_front(key, new Value(value));
+	bucket[hash(key) & key_mask].emplace_front(key, value);
 	++size_;
 #ifdef ENABLE_PROFILING
 	insert_ops += 2;
@@ -316,12 +305,11 @@ void HashTable<Key,Value>::erase(const Key &key) {
 #ifdef ENABLE_PROFILING
 	erase_ops += find_ops;
 #endif
-	delete (*iter).value_ptr;
 	bucket[hash(key) & key_mask].erase(iter.it);
 	--size_;
 
 #ifdef ENABLE_PROFILING
-	erase_ops += 3;
+	erase_ops += 2;
 #endif
 }
 
@@ -330,10 +318,8 @@ void HashTable<Key, Value>::rehash() {
 	HashTable new_table(num_of_buckets*2);
 
 	for (auto it: *this) {
-		// Быстрая вставка без лишнего выделения памяти под данные (вставляются только ключ и указатель)
-		new_table.insert_fast(it.key, it.value_ptr);
-		// "Затирание" указателя, чтобы при удалении старой таблицы не удалялись данные по указателям
-		it.value_ptr = nullptr;
+		// Быстрая вставка без поиска
+		new_table.insert_fast(move(it));
 	}
 	new_table.size_ = size_;
 
@@ -351,7 +337,7 @@ Value& HashTable<Key, Value>::operator[](const Key &key) {
 #endif
 
 	if (it != end()) {
-		return *(it->value_ptr);
+		return it->second;
 	}
 	else {
 		insert(key, Value());
@@ -362,45 +348,14 @@ Value& HashTable<Key, Value>::operator[](const Key &key) {
 	#ifdef ENABLE_PROFILING
 		brackets_ops += find_ops;
 	#endif
-		return *(another_it->value_ptr);
-	}
-}
-
-template <typename Key, typename Value>
-const Value& HashTable<Key, Value>::operator[](const Key &key) const {
-#ifdef ENABLE_PROFILING
-	brackets_ops = 0;
-#endif
-	auto it = find(key);
-#ifdef ENABLE_PROFILING
-	brackets_ops += find_ops;
-#endif
-
-	if (it != end()) {
-		return *(it->value_ptr);
-	}
-	else {
-		insert(key, Value());
-	#ifdef ENABLE_PROFILING
-		brackets_ops += insert_ops;
-	#endif
-		auto another_it = find(key);
-	#ifdef ENABLE_PROFILING
-		brackets_ops += find_ops;
-	#endif
-		return *(another_it->value_ptr);
+		return another_it->second;
 	}
 }
 
 template <typename Key, typename Value>
 void HashTable<Key, Value>::clear() {
 #ifdef ENABLE_PROFILING
-	clear_ops = 0;
-#endif
-	for (auto it: *this)
-		delete it.value_ptr;
-#ifdef ENABLE_PROFILING
-	brackets_ops += size_ + 2*num_of_buckets;
+	clear_ops = size_ + num_of_buckets;
 #endif
 
 	size_ = 0;

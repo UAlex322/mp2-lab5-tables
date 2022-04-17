@@ -9,21 +9,16 @@ using namespace std;
 template <typename Key, typename Value>
 class UnorderedTable {
 
-	struct Entry {
-		Key key;
-		Value *value_ptr;
-		
-		Entry(const Key &key = Key(), Value *value_ptr = nullptr): key(key), value_ptr(value_ptr) {}
-	};
+	using Entry = pair<Key,Value>;
+	using iterator = typename vector<Entry>::iterator;
 
 	vector<Entry> table;
-	using iterator = typename vector<Entry>::iterator;
 #ifdef ENABLE_PROFILING
-	size_t find_ops;
-	size_t insert_ops;
-	size_t erase_ops;
-	size_t clear_ops;
-	size_t brackets_ops;
+	size_t find_ops = 0;
+	size_t insert_ops = 0;
+	size_t erase_ops = 0;
+	size_t clear_ops = 0;
+	size_t brackets_ops = 0;
 #endif
 	
 	iterator common_find(const Key &key) {
@@ -34,7 +29,7 @@ class UnorderedTable {
 		#ifdef ENABLE_PROFILING
 			++find_ops;
 		#endif
-			if ((*it).key == key)
+			if (it->first == key)
 				return it;
 		}
 
@@ -55,14 +50,14 @@ public:
 		table.reserve(2*sz);
 
 		for (auto it = first; it != last; ++it)
-			table.emplace_back((*it).first, new Value((*it).second));
+			table.emplace_back(*it);
 	}
 
-	UnorderedTable(const initializer_list<pair<Key,Value>> &init) {
-		table.reserve(2*init.size());
+	UnorderedTable(const initializer_list<pair<Key,Value>> &init_list) {
+		table.reserve(2*init_list.size());
 
-		for (auto it = init.begin(); it != init.end(); ++it)
-			table.emplace_back((*it).first, new Value((*it).second));
+		for (auto entry: init_list)
+			table.emplace_back(entry);
 	}
 
 	~UnorderedTable() {
@@ -84,7 +79,7 @@ public:
 		if (it != end())
 			throw string("Entry with this key already exists");
 
-		table.emplace_back(key, new Value(value));
+		table.emplace_back(key, value);
 	#ifdef ENABLE_PROFILING
 		++insert_ops;
 	#endif
@@ -105,7 +100,6 @@ public:
 		if (it == end())
 			throw string("Entry with this key doesn't exist");
 
-		delete (*it).value_ptr;
 		swap(*it, table.back());
 		table.pop_back();
 
@@ -124,35 +118,16 @@ public:
 	#endif
 
 		if (it != table.end())
-			return *((*it).value_ptr);
+			return it->second;
 		else {
-			table.emplace_back(key, new Value());
+			table.emplace_back(key, Value());
 		#ifdef ENABLE_PROFILING
 			++brackets_ops;
 		#endif
-			return *(table.back().value_ptr);
+			return table.back().second;
 		}
 	}
 
-	const Value &operator[](const Key &key) const {
-	#ifdef ENABLE_PROFILING
-		brackets_ops = 0;
-	#endif
-		auto it = find(key);
-	#ifdef ENABLE_PROFILING
-		brackets_ops += find_ops;
-	#endif
-
-		if (it != table.end())
-			return *((*it).value_ptr);
-		else {
-			table.emplace_back(key, new Value());
-		#ifdef ENABLE_PROFILING
-			++brackets_ops;
-		#endif
-			return *(table.back().value_ptr);
-		}
-	}
 
 	void size() const noexcept {
 		return table.size();
@@ -164,13 +139,7 @@ public:
 
 	void clear() {
 	#ifdef ENABLE_PROFILING
-		clear_ops = 0;
-	#endif
-
-		for (auto it: table)
-			delete it.value_ptr;
-	#ifdef ENABLE_PROFILING
-		clear_ops += table.size();
+		clear_ops = table.size();
 	#endif
 
 		table.clear();
