@@ -31,7 +31,9 @@ public:
 	public:
 
 		reference operator*() const { return *it; }
-		pointer operator->() const {return &(*it); }
+		pointer operator->() const {
+			return &(*it); 
+		}
 
 		iterator& operator++() {
 			++it;
@@ -69,8 +71,8 @@ public:
 		}
 		iterator operator--(int) {iterator tmp = *this; --(*this); return tmp; }
 
-		bool operator==(const iterator &iter) const { return index == iter.index && this->it == iter.it; }
-		bool operator!=(const iterator &iter) const {return index != iter.index || this->it != iter.it; }
+		bool operator==(const iterator &iter) const { return index == iter.index && it == iter.it; }
+		bool operator!=(const iterator &iter) const {return index != iter.index || it != iter.it; }
 
 	private:
 		HashTable &ht; // исходная таблица нужна, чтобы обращаться к её полям
@@ -144,27 +146,49 @@ public:
 
 	// METHODS
 
-	HashTable(): num_of_buckets(8), size_(0), key_mask(num_of_buckets-1) {
+	HashTable() {
 		bucket.resize(num_of_buckets);
 	}
 
 	HashTable(const HashTable &copy): bucket(copy.bucket), num_of_buckets(copy.num_of_buckets), size_(copy.size_), key_mask(copy.key_mask) {}
-	HashTable(HashTable &&mov): bucket(move(mov.bucket)), num_of_buckets(mov.num_of_buckets), size_(mov.size_), key_mask(mov.key_mask) {}
+	HashTable(HashTable &&mov): num_of_buckets(mov.num_of_buckets), size_(mov.size_), key_mask(mov.key_mask) {
+		bucket = move(mov.bucket);
+	}
+	//HashTable(HashTable &&mov);
+	HashTable(const initializer_list<pair<Key,Value>> &init_list);
+	template <typename Iterator>
+	HashTable(Iterator first, Iterator last);
+	HashTable& operator=(const HashTable &copy) {
+		bucket = copy.bucket;
+		num_of_buckets = copy.num_of_buckets;
+		size_ = copy.size_;
+		key_mask = copy.key_mask;
 
+		return *this;
+	}
+	HashTable& operator=(HashTable &&mov) {
+		bucket = move(mov.bucket);
+		num_of_buckets = mov.num_of_buckets;
+		size_ = mov.size_;
+		key_mask = mov.key_mask;
+
+		return *this;
+	}
 	~HashTable() {
 		clear();
 	}
 
 	iterator find(const Key &key);
 	void insert(const Key &key, const Value &value);
+	void insert(const pair<Key, Value> &pair) {
+		insert(pair.first, pair.second);
+	}
 	void erase(const Key &key);
 	Value& operator[](const Key &key);
 
-	size_t size() {return size_;}
-	void clear();
-	bool empty() const noexcept {
-		return size_ == 0;
-	}
+	inline size_t size() {return size_;}
+	inline void clear();
+	inline bool empty() const noexcept { return size_ == 0; }
 
 	iterator begin();
 	iterator end();
@@ -180,12 +204,12 @@ public:
 #endif
 
 private:
-	vector<list<Entry>> bucket;
-	std::hash<Key> hash;
-	size_t num_of_buckets;
-	size_t size_;
-	size_t key_mask;
+	size_t num_of_buckets = 8;
+	size_t size_ = 0;
+	size_t key_mask = 7;
 	double max_load_factor = 1.0;
+	vector<list<Entry>> bucket = vector<list<Entry>>(num_of_buckets);
+	std::hash<Key> hash;
 #ifdef ENABLE_PROFILING
 	size_t find_ops = 0;
 	size_t insert_ops = 0;
@@ -201,13 +225,30 @@ private:
 
 	iterator common_find(const Key &key);
 
-	void insert_fast(pair<Key,Value> &&entry) {
-		bucket[hash(entry.first) & key_mask].emplace_front(entry);
+	void insert_fast(const pair<Key,Value> &entry) {
+		bucket[hash(entry.first) & key_mask].emplace_front(move(entry));
 	}
 
 	// рехеш
 	void rehash();
 };
+
+template <typename Key, typename Value>
+HashTable<Key,Value>::HashTable(const initializer_list<pair<Key,Value>> &init_list) {
+	for (auto entry: init_list) {
+		if (find(entry.first) == end())
+			insert(entry);
+	}
+}
+
+template <typename Key, typename Value>
+template <typename Iterator>
+HashTable<Key,Value>::HashTable(Iterator first, Iterator last) {
+	for (auto it = first; it != last; ++it)
+		if (find(it->first) == end())
+			insert(it->first, it->second);
+}
+
 
 template <typename Key, typename Value>
 typename HashTable<Key,Value>::iterator HashTable<Key,Value>::begin() {
@@ -259,7 +300,7 @@ typename HashTable<Key,Value>::iterator HashTable<Key,Value>::common_find(const 
 		++find_ops;
 	#endif
 		if (it->first == key)
-			return iterator(*this, it, hash_val);
+			return iterator(*this, it, hash_val & key_mask);
 		++it;
 	}
 
@@ -290,7 +331,7 @@ void HashTable<Key,Value>::insert(const Key &key, const Value &value) {
 	insert_ops += 2;
 #endif
 
-	if (size_ > num_of_buckets * max_load_factor) rehash();
+	if (size_ >= num_of_buckets * max_load_factor) rehash();
 }
 
 template <typename Key, typename Value>
@@ -317,17 +358,16 @@ template <typename Key, typename Value>
 void HashTable<Key, Value>::rehash() {
 	HashTable new_table(num_of_buckets*2);
 
-	for (auto it: *this) {
+	for (auto entry: *this)
 		// Быстрая вставка без поиска
-		new_table.insert_fast(move(it));
-	}
-	new_table.size_ = size_;
+		new_table.insert_fast(entry);
 
-	bucket = move(new_table.bucket);
+	new_table.size_ = size_;
+	*this = move(new_table);
 }
 
 template <typename Key, typename Value>
-Value& HashTable<Key, Value>::operator[](const Key &key) {
+Value& HashTable<Key,Value>::operator[](const Key &key) {
 #ifdef ENABLE_PROFILING
 	brackets_ops = 0;
 #endif
@@ -353,7 +393,7 @@ Value& HashTable<Key, Value>::operator[](const Key &key) {
 }
 
 template <typename Key, typename Value>
-void HashTable<Key, Value>::clear() {
+inline void HashTable<Key, Value>::clear() {
 #ifdef ENABLE_PROFILING
 	clear_ops = size_ + num_of_buckets;
 #endif

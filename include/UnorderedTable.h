@@ -49,15 +49,19 @@ public:
 		size_t sz = distance(first, last);
 		table.reserve(2*sz);
 
-		for (auto it = first; it != last; ++it)
-			table.emplace_back(*it);
+		for (auto it = first; it != last; ++it) {
+			if (find(it->first) == end())
+				table.emplace_back(*it);
+		}
 	}
 
 	UnorderedTable(const initializer_list<pair<Key,Value>> &init_list) {
 		table.reserve(2*init_list.size());
 
-		for (auto entry: init_list)
+		for (auto entry: init_list) {
+			if (find(entry.first) == end())
 			table.emplace_back(entry);
+		}
 	}
 
 	~UnorderedTable() {
@@ -129,15 +133,15 @@ public:
 	}
 
 
-	void size() const noexcept {
+	inline size_t size() const noexcept {
 		return table.size();
 	}
 
-	bool empty() const noexcept {
+	inline bool empty() const noexcept {
 		return table.size() == 0;
 	}
 
-	void clear() {
+	inline void clear() {
 	#ifdef ENABLE_PROFILING
 		clear_ops = table.size();
 	#endif

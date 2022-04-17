@@ -3,6 +3,7 @@
 #include "../include/OrderedTable.h"
 #include "../include/HashTable.h"
 #include <random>
+#include <iostream>
 #include <string>
 using namespace std;
 
@@ -10,7 +11,8 @@ mt19937 gen(random_device{}());
 
 //UNORDERED_TABLE
 
-// ћакросы руг¤ютс¤ на несколько параметров в шаблонах классов!
+
+// Макросы ругаются на несколько параметров в шаблонах классов!
 using UnorderedTableIntInt = UnorderedTable<int,int>;
 
 TEST(UnorderedTable, can_create_empty_table) {
@@ -19,14 +21,14 @@ TEST(UnorderedTable, can_create_empty_table) {
 
 TEST(UnorderedTable, initializer_list_constructor_is_correct) {
 	for (size_t i = 0; i < 10; ++i) {
-		initializer_list<pair<int, int>> init{{gen(),gen()},{gen(),gen()},{gen(),gen()},{gen(),gen()},{gen(),gen()}};
+		initializer_list<pair<int, int>> init{{4,gen()},{3,gen()},{5,gen()},{2,gen()},{1,gen()}};
 
 		ASSERT_NO_THROW(
 			UnorderedTableIntInt table(init);
 			for (auto entry: table) {
 				for (auto pair: init) {
-					if (entry.key == pair.first) {
-						EXPECT_EQ(*entry.value_ptr, pair.second);
+					if (entry.first == pair.first) {
+						EXPECT_EQ(entry.second, pair.second);
 						break;
 					}
 				}
@@ -38,15 +40,16 @@ TEST(UnorderedTable, initializer_list_constructor_is_correct) {
 TEST(UnorderedTable, range_constructor_is_correct) {
 	for (size_t i = 0; i < 10; ++i) {
 		vector<pair<int,int>> vec(500);
-		for (auto pair: vec)
-			pair = {gen(), gen()};
+		for (size_t i = 0; i < 500; ++i)
+			vec[i] = {i,gen()};
+		shuffle(vec.begin(), vec.end(), gen);
 		
 		ASSERT_NO_THROW(
 			UnorderedTableIntInt table(vec.begin(), vec.end());
 			for (auto entry: table) {
 				for (auto pair: vec) {
-					if (entry.key == pair.first) {
-						EXPECT_EQ(*entry.value_ptr, pair.second);
+					if (entry.first == pair.first) {
+						EXPECT_EQ(entry.second, pair.second);
 						break;
 					}
 				}
@@ -56,73 +59,88 @@ TEST(UnorderedTable, range_constructor_is_correct) {
 }
 
 TEST(UnorderedTable, find_is_correct) {
-	vector<pair<int,int>> vec(200);
-	for (size_t i = 0; i < 200; ++i)
-		vec[i] = {i, 2*i};
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	UnorderedTableIntInt table(vec.rbegin(), vec.rend());
-	for (int i = 0; i < 200; ++i) {
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		// проверка, что запись с таким ключом есть
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		UnorderedTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) {
+				auto iter = table.find(elem.first);
+				EXPECT_NE(iter, table.end());
+				EXPECT_EQ(iter->second, elem.second);
+			}
+		);
+		for (size_t i = data.size(); i < data.size()*2; ++i)
+			ASSERT_NO_THROW(EXPECT_EQ(table.find(i), table.end()));
 	}
-
-	for (int i = 200; i < 500; ++i)
-		// проверка, что записей с таким ключом нет
-		EXPECT_EQ(table.find(i), table.end()); 
 }
 
 TEST(UnorderedTable, insert_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i,2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		UnorderedTableIntInt table;
+		for (size_t i = 0; i < data.size(); ++i) {
+			table.insert(data[i]);
+			auto iter = table.find(data[i].first);
+			EXPECT_NE(iter, table.end());
+			EXPECT_EQ(iter->second, data[i].second);
+		}
+
+		for (auto elem: data)
+			// если ключ занят, выбрасывается исключение
+			ASSERT_ANY_THROW(table.insert(elem));
 	}
-
-	for (size_t i = 0; i < 200; ++i)
-		// если ключ зан¤т, выбрасываетс¤ исключение
-		ASSERT_ANY_THROW(table.insert(i,2*i)); 
 }
 
 TEST(UnorderedTable, erase_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i,2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		UnorderedTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) {
+				auto iter = table.find(elem.first);
+				EXPECT_NE(iter, table.end());
+				EXPECT_EQ(iter->second, elem.second);
+
+				table.erase(elem.first);
+				EXPECT_EQ(table.find(elem.first), table.end());
+			}
+		);
+
+		for (auto elem: data)
+			ASSERT_ANY_THROW(table.erase(elem.first));
 	}
-
-	for (size_t i = 0; i < 200; ++i) {
-		ASSERT_NO_THROW(table.erase(i));
-		EXPECT_EQ(table.find(i), table.end());
-	}
-
-	for (size_t i = 0; i < 200; ++i)
-		// повторное удаление записи выбрасывает исключение
-		ASSERT_ANY_THROW(table.erase(i)); 
 }
 
 TEST(UnorderedTable, square_brackets_operator_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i, 2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		UnorderedTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) 
+				EXPECT_EQ(table[elem.first], elem.second);
+		);
+
+		for (size_t i = data.size(); i < 2*data.size(); ++i) {
+			ASSERT_NO_THROW(EXPECT_EQ(table[i], int()));
+			EXPECT_EQ(table.size(), i+1);
+		}
 	}
-
-	for (size_t i = 0; i < 200; ++i)
-		ASSERT_NO_THROW(EXPECT_EQ(table[i], 2*i));
-	for (size_t i = 200; i < 500; ++i)
-		// при обращении к несуществующей записи создаЄтс¤ нова¤ со значением по умолчанию
-		ASSERT_NO_THROW(EXPECT_EQ(table[i], int()));
 }
 
 //ORDERED_TABLE
@@ -130,19 +148,19 @@ TEST(UnorderedTable, square_brackets_operator_is_correct) {
 using OrderedTableIntInt = OrderedTable<int,int>;
 
 TEST(OrderedTable, can_create_empty_table) {
-	ASSERT_NO_THROW(UnorderedTableIntInt t);
+	ASSERT_NO_THROW(OrderedTableIntInt t);
 }
 
 TEST(OrderedTable, initializer_list_constructor_is_correct) {
 	for (size_t i = 0; i < 10; ++i) {
-		initializer_list<pair<int, int>> init{{gen(),gen()},{gen(),gen()},{gen(),gen()},{gen(),gen()},{gen(),gen()}};
+		initializer_list<pair<int, int>> init{{4,gen()},{3,gen()},{5,gen()},{2,gen()},{1,gen()}};
 
 		ASSERT_NO_THROW(
-			UnorderedTableIntInt table(init);
+			OrderedTableIntInt table(init);
 		for (auto entry: table) {
 			for (auto pair: init) {
-				if (entry.key == pair.first) {
-					EXPECT_EQ(*entry.value_ptr, pair.second);
+				if (entry.first == pair.first) {
+					EXPECT_EQ(entry.second, pair.second);
 					break;
 				}
 			}
@@ -154,15 +172,16 @@ TEST(OrderedTable, initializer_list_constructor_is_correct) {
 TEST(OrderedTable, range_constructor_is_correct) {
 	for (size_t i = 0; i < 10; ++i) {
 		vector<pair<int,int>> vec(500);
-		for (auto pair: vec)
-			pair = {gen(), gen()};
+		for (size_t i = 0; i < 500; ++i)
+			vec[i] = {i,gen()};
+		shuffle(vec.begin(), vec.end(), gen);
 
 		ASSERT_NO_THROW(
-			UnorderedTableIntInt table(vec.begin(), vec.end());
+			OrderedTableIntInt table(vec.begin(), vec.end());
 		for (auto entry: table) {
 			for (auto pair: vec) {
-				if (entry.key == pair.first) {
-					EXPECT_EQ(*entry.value_ptr, pair.second);
+				if (entry.first == pair.first) {
+					EXPECT_EQ(entry.second, pair.second);
 					break;
 				}
 			}
@@ -172,73 +191,88 @@ TEST(OrderedTable, range_constructor_is_correct) {
 }
 
 TEST(OrderedTable, find_is_correct) {
-	vector<pair<int,int>> vec(200);
-	for (size_t i = 0; i < 200; ++i)
-		vec[i] = {i, 2*i};
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	UnorderedTableIntInt table(vec.rbegin(), vec.rend());
-	for (int i = 0; i < 200; ++i) {
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		// проверка, что запись с таким ключом есть
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		OrderedTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) {
+				auto iter = table.find(elem.first);
+				EXPECT_NE(iter, table.end());
+				EXPECT_EQ(iter->second, elem.second);
+			}
+		);
+		for (size_t i = data.size(); i < data.size()*2; ++i)
+			ASSERT_NO_THROW(EXPECT_EQ(table.find(i), table.end()));
 	}
-
-	for (int i = 200; i < 500; ++i)
-		// проверка, что записей с таким ключом нет
-		EXPECT_EQ(table.find(i), table.end()); 
 }
 
 TEST(OrderedTable, insert_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i,2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		OrderedTableIntInt table;
+		for (size_t i = 0; i < data.size(); ++i) {
+			table.insert(data[i]);
+			auto iter = table.find(data[i].first);
+			EXPECT_NE(iter, table.end());
+			EXPECT_EQ(iter->second, data[i].second);
+		}
+
+		for (auto elem: data)
+			// если ключ занят, выбрасывается исключение
+			ASSERT_ANY_THROW(table.insert(elem));
 	}
-
-	for (size_t i = 0; i < 200; ++i)
-		// если ключ зан¤т, выбрасываетс¤ исключение
-		ASSERT_ANY_THROW(table.insert(i,2*i)); 
 }
 
 TEST(OrderedTable, erase_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i,2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		OrderedTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) {
+				auto iter = table.find(elem.first);
+				EXPECT_NE(iter, table.end());
+				EXPECT_EQ(iter->second, elem.second);
+
+				table.erase(elem.first);
+				EXPECT_EQ(table.find(elem.first), table.end());
+			}
+		);
+
+		for (auto elem: data)
+			ASSERT_ANY_THROW(table.erase(elem.first));
 	}
-
-	for (size_t i = 0; i < 200; ++i) {
-		ASSERT_NO_THROW(table.erase(i));
-		EXPECT_EQ(table.find(i), table.end());
-	}
-
-	for (size_t i = 0; i < 200; ++i)
-		// повторное удаление записи выбрасывает исключение
-		ASSERT_ANY_THROW(table.erase(i)); 
 }
 
 TEST(OrderedTable, square_brackets_operator_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i, 2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		OrderedTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) 
+				EXPECT_EQ(table[elem.first], elem.second);
+		);
+
+		for (size_t i = data.size(); i < 2*data.size(); ++i) {
+			ASSERT_NO_THROW(EXPECT_EQ(table[i], int()));
+			EXPECT_EQ(table.size(), i+1);
+		}
 	}
-
-	for (size_t i = 0; i < 200; ++i)
-		ASSERT_NO_THROW(EXPECT_EQ(table[i], 2*i));
-	for (size_t i = 200; i < 500; ++i)
-		// при обращении к несуществующей записи создаЄтс¤ нова¤ со значением по умолчанию
-		ASSERT_NO_THROW(EXPECT_EQ(table[i], int()));
 }
 
 //HASH_TABLE
@@ -246,113 +280,130 @@ TEST(OrderedTable, square_brackets_operator_is_correct) {
 using HashTableIntInt = HashTable<int,int>;
 
 TEST(HashTable, can_create_empty_table) {
-	ASSERT_NO_THROW(UnorderedTableIntInt t);
+	ASSERT_NO_THROW(HashTableIntInt t);
 }
 
 TEST(HashTable, initializer_list_constructor_is_correct) {
 	for (size_t i = 0; i < 10; ++i) {
-		initializer_list<pair<int, int>> init{{gen(),gen()},{gen(),gen()},{gen(),gen()},{gen(),gen()},{gen(),gen()}};
+		initializer_list<pair<int, int>> init{{4,gen()},{3,gen()},{5,gen()},{2,gen()},{1,gen()}};
 
 		ASSERT_NO_THROW(
-			UnorderedTableIntInt table(init);
-		for (auto entry: table) {
-			for (auto pair: init) {
-				if (entry.key == pair.first) {
-					EXPECT_EQ(*entry.value_ptr, pair.second);
-					break;
+			HashTableIntInt table(init);
+			for (auto entry: table) {
+				for (auto pair: init) {
+					if (entry.first == pair.first) {
+						EXPECT_EQ(entry.second, pair.second);
+						break;
+					}
 				}
 			}
-		}
 		);
 	}
 }
 
 TEST(HashTable, range_constructor_is_correct) {
 	for (size_t i = 0; i < 10; ++i) {
-		vector<pair<int,int>> vec(500);
-		for (auto pair: vec)
-			pair = {gen(), gen()};
+		vector<pair<int,int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i,gen()};
+		shuffle(data.begin(), data.end(), gen);
 
 		ASSERT_NO_THROW(
-			UnorderedTableIntInt table(vec.begin(), vec.end());
-		for (auto entry: table) {
-			for (auto pair: vec) {
-				if (entry.key == pair.first) {
-					EXPECT_EQ(*entry.value_ptr, pair.second);
-					break;
-				}
-			}
-		}
+			HashTableIntInt table(data.begin(), data.end());
+			for (auto entry: table)
+				EXPECT_NE(find(data.begin(),data.end(),entry), data.end());
 		);
 	}
 }
 
+int done = 0;
+int it;
+size_t iteration = 0;
+
 TEST(HashTable, find_is_correct) {
-	vector<pair<int,int>> vec(200);
-	for (size_t i = 0; i < 200; ++i)
-		vec[i] = {i, 2*i};
+	for (size_t &i = iteration; i < 10; ++i) {
+		done = 0, it = 0;
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	UnorderedTableIntInt table(vec.rbegin(), vec.rend());
-	for (int i = 0; i < 200; ++i) {
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		// проверка, что запись с таким ключом есть
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		HashTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) {		
+				auto iter = table.find(elem.first);
+				EXPECT_NE(iter, table.end());
+				EXPECT_EQ(iter->second, elem.second);
+				++it;
+			}
+		);
+		done = 1;
+		for (size_t i = data.size(); i < data.size()*2; ++i)
+			ASSERT_NO_THROW(EXPECT_EQ(table.find(i), table.end()));
 	}
-
-	for (int i = 200; i < 500; ++i)
-		// проверка, что записей с таким ключом нет
-		EXPECT_EQ(table.find(i), table.end()); 
 }
 
 TEST(HashTable, insert_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i,2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		HashTableIntInt table;
+		for (size_t i = 0; i < data.size(); ++i) {
+			table.insert(data[i]);
+			auto iter = table.find(data[i].first);
+			EXPECT_NE(iter, table.end());
+			EXPECT_EQ(iter->second, data[i].second);
+		}
+
+		for (auto elem: data)
+			// если ключ занят, выбрасывается исключение
+			ASSERT_ANY_THROW(table.insert(elem));
 	}
-
-	for (size_t i = 0; i < 200; ++i)
-		// если ключ зан¤т, выбрасываетс¤ исключение
-		ASSERT_ANY_THROW(table.insert(i,2*i)); 
 }
 
 TEST(HashTable, erase_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i,2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		HashTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) {
+				auto iter = table.find(elem.first);
+				EXPECT_NE(iter, table.end());
+				EXPECT_EQ(iter->second, elem.second);
+
+				table.erase(elem.first);
+				EXPECT_EQ(table.find(elem.first), table.end());
+			}
+		);
+
+		for (auto elem: data)
+			ASSERT_ANY_THROW(table.erase(elem.first));
 	}
-
-	for (size_t i = 0; i < 200; ++i) {
-		ASSERT_NO_THROW(table.erase(i));
-		EXPECT_EQ(table.find(i), table.end());
-	}
-
-	for (size_t i = 0; i < 200; ++i)
-		// повторное удаление записи выбрасывает исключение
-		ASSERT_ANY_THROW(table.erase(i)); 
 }
 
 TEST(HashTable, square_brackets_operator_is_correct) {
-	UnorderedTableIntInt table;
+	for (size_t i = 0; i < 10; ++i) {
+		vector<pair<int, int>> data(gen() % 100);
+		for (size_t i = 0; i < data.size(); ++i)
+			data[i] = {i, gen()};
+		shuffle(data.begin(), data.end(), gen);
 
-	for (size_t i = 0; i < 200; ++i) {
-		table.insert(i, 2*i);
-		auto iter = table.find(i);
-		EXPECT_NE(iter, table.end());
-		EXPECT_EQ(*((*iter).value_ptr), 2*i);
+		HashTableIntInt table(data.begin(), data.end());
+		ASSERT_NO_THROW(
+			for (auto elem: data) 
+				EXPECT_EQ(table[elem.first], elem.second);
+		);
+
+		for (size_t i = data.size(); i < 2*data.size(); ++i) {
+			ASSERT_NO_THROW(EXPECT_EQ(table[i], int()));
+			EXPECT_EQ(table.size(), i+1);
+		}
 	}
-
-	for (size_t i = 0; i < 200; ++i)
-		ASSERT_NO_THROW(EXPECT_EQ(table[i], 2*i));
-	for (size_t i = 200; i < 500; ++i)
-		// при обращении к несуществующей записи создаЄтс¤ нова¤ со значением по умолчанию
-		ASSERT_NO_THROW(EXPECT_EQ(table[i], int()));
 }

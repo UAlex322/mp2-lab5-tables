@@ -236,13 +236,13 @@ void menu() {
 			}
 
 			else if (command == "print_all") {
-				if (ord_table.empty())
+				if (hash_table.empty())
 					cout << "No polinomial exists" << endl << endl;
 				else {
 					cout << "All polinomials:" << endl;
 
-					for (auto &p : ord_table)
-						cout << "" << p.key << " = " << *(p.value_ptr) << endl;
+					for (auto &p : hash_table)
+						cout << "" << p.first << " = " << p.second << endl;
 					cout << endl;
 				}
 			}
@@ -273,13 +273,14 @@ void menu() {
 
 				if (!is_empty_string(dummy))
 					cout << "Invalid command" << endl << endl;
-
+				else if (ord_table.empty())
+					cout << "There are no polinomials" << endl << endl;
 				else {
 					unord_table.clear();
 					ord_table.clear();
 					hash_table.clear();
 
-					cout << "'" << name << "': all polinomials have been deleted successfully" << endl;
+					cout << "All polinomials have been deleted successfully" << endl;
 					PRINT_OPERATIONS(clear);
 					cout << endl;
 				}

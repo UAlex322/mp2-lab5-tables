@@ -52,8 +52,10 @@ public:
 		size_t sz = distance(first, last);
 		table.reserve(2*sz);
 
-		for (auto it = first; it != last; ++it)
-			table.emplace_back(*it);
+		for (auto it = first; it != last; ++it) {
+			if (find(it->first) == end())
+				table.emplace_back(*it);
+		}
 
 		sort(table.begin(), table.end(), [](const Entry &e1, const Entry &e2) {
 			return e1.first < e2.first;
@@ -67,7 +69,7 @@ public:
 			table.emplace_back(entry);
 
 		sort(table.begin(), table.end(), [](const Entry &e1, const Entry &e2) {
-			return e1.key < e2.key;
+			return e1.first < e2.first;
 		});
 	}
 
@@ -108,6 +110,10 @@ public:
 			++insert_ops;
 		#endif
 		}
+	}
+
+	void insert(const pair<Key, Value> &pair) {
+		insert(pair.first, pair.second);
 	}
 
 	void erase(const Key &key) {
@@ -164,15 +170,15 @@ public:
 		}
 	}
 
-	void size() const noexcept {
+	inline size_t size() const noexcept {
 		return table.size();
 	}
 
-	bool empty() const noexcept {
+	inline bool empty() const noexcept {
 		return table.size() == 0;
 	}
 
-	void clear() {
+	inline void clear() {
 	#ifdef ENABLE_PROFILING
 		clear_ops = table.size();
 	#endif
