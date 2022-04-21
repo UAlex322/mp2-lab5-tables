@@ -68,6 +68,16 @@ public:
 		clear();
 	}
 
+	UnorderedTable& operator=(const UnorderedTable &copy) {
+		table = copy.table;
+		return *this;
+	}
+
+	UnorderedTable&& operator=(UnorderedTable &&mov) {
+		table = move(mov.table);
+		return *this;
+	}
+
 	iterator find(const Key &key) {
 		return common_find(key);
 	}

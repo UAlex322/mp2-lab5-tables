@@ -77,6 +77,16 @@ public:
 		clear();
 	}
 
+	OrderedTable& operator=(const OrderedTable &copy) {
+		table = copy.table;
+		return *this;
+	}
+
+	OrderedTable&& operator=(OrderedTable &&mov) {
+		table = move(mov.table);
+		return *this;
+	}
+
 	iterator find(const Key &key) {
 		size_t pos = common_find(key);
 
